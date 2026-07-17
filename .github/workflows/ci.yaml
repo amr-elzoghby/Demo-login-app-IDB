@@ -1,0 +1,159 @@
+name: App Build & GitOps Push
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ROLE_ARN: arn:aws:iam::851236938302:role/idp-prod-github-actions-role
+  ECR_REGISTRY: 851236938302.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: idp-team-alpha-login-app
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout App Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR Repository Exists
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} || \
+          aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} \
+            --image-scanning-configuration scanOnPush=true \
+            --encryption-configuration encryptionType=AES256
+
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }} .
+
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL'
+
+      - name: Push Image to ECR
+        run: |
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+      - name: Promote to GitOps Platform Repository
+        run: |
+          git clone "https://x-access-token:${{ secrets.GH_PAT }}@github.com/amr-elzoghby/Internal-Developer-Platform.git" platform-repo
+          cd platform-repo
+          
+          # Create directory structure if not exists
+          mkdir -p apps/team-alpha/login-app
+          
+          MANIFEST_FILE="apps/team-alpha/login-app/deployment.yaml"
+          
+          # Write deployment manifest pointing to the new ECR image tag
+          cat <<EOF > $MANIFEST_FILE
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: login-app
+            namespace: team-alpha
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: login-app
+            template:
+              metadata:
+                labels:
+                  app: login-app
+              spec:
+                containers:
+                  - name: login-app
+                    image: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+                    ports:
+                      - containerPort: 3000
+                    env:
+                      - name: PORT
+                        value: "3000"
+                      - name: DB_HOST
+                        valueFrom:
+                          secretKeyRef:
+                            name: team-alpha-db-conn
+                            key: host
+                      - name: DB_USER
+                        valueFrom:
+                          secretKeyRef:
+                            name: team-alpha-db-conn
+                            key: username
+                      - name: DB_PASSWORD
+                        valueFrom:
+                          secretKeyRef:
+                            name: team-alpha-db-conn
+                            key: password
+                      - name: DB_NAME
+                        value: postgres
+                      - name: DB_PORT
+                        valueFrom:
+                          secretKeyRef:
+                            name: team-alpha-db-conn
+                            key: port
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: login-app
+            namespace: team-alpha
+          spec:
+            type: ClusterIP
+            ports:
+              - port: 3000
+                targetPort: 3000
+            selector:
+              app: login-app
+          ---
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: login-app-ingress
+            namespace: team-alpha
+            annotations:
+              nginx.ingress.kubernetes.io/ssl-redirect: "false"
+          spec:
+            ingressClassName: nginx
+            rules:
+              - host: login.idp-prod.local
+                http:
+                  paths:
+                    - path: /
+                      pathType: Prefix
+                      backend:
+                        service:
+                          name: login-app
+                          port:
+                            number: 3000
+          EOF
+          
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add $MANIFEST_FILE
+          git commit -m "image: promote team-alpha login-app to ${{ env.IMAGE_TAG }} [skip ci]"
+          git push

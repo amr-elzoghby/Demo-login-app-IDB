@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IDP Demo Application</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: rgba(17, 25, 40, 0.65);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: linear-gradient(135deg, #7c3aed, #db2777);
+      --primary-hover: linear-gradient(135deg, #6d28d9, #be185d);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --input-bg: rgba(255, 255, 255, 0.03);
+      --input-border: rgba(255, 255, 255, 0.1);
+      --success: #10b981;
+      --error: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow-x: hidden;
+      position: relative;
+      padding: 2rem 1rem;
+    }
+
+    /* Ambient background glows */
+    body::before {
+      content: '';
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.15) 0%, rgba(0,0,0,0) 70%);
+      top: 10%;
+      left: 10%;
+      z-index: -1;
+    }
+
+    body::after {
+      content: '';
+      position: absolute;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(219, 39, 119, 0.15) 0%, rgba(0,0,0,0) 70%);
+      bottom: 10%;
+      right: 10%;
+      z-index: -1;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 450px;
+      z-index: 1;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      background: var(--primary);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+
+    .header p {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 2.5rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      margin-bottom: 2rem;
+    }
+
+    .tabs {
+      display: flex;
+      background: rgba(255, 255, 255, 0.03);
+      padding: 0.3rem;
+      border-radius: 14px;
+      border: 1px solid var(--input-border);
+      margin-bottom: 2rem;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 0.75rem;
+      text-align: center;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      border-radius: 11px;
+      transition: all 0.3s ease;
+    }
+
+    .tab.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 0.85rem 1.2rem;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 12px;
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    .form-group input:focus {
+      border-color: #7c3aed;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 0.9rem;
+      background: var(--primary);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 20px rgba(124, 58, 237, 0.2);
+    }
+
+    .btn:hover {
+      background: var(--primary-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(124, 58, 237, 0.3);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .alert {
+      padding: 1rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      display: none;
+      font-weight: 500;
+      text-align: center;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      display: block;
+    }
+
+    .alert-error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      display: block;
+    }
+
+    .database-viewer {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 2rem;
+      margin-top: 1rem;
+    }
+
+    .database-viewer h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .refresh-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--input-border);
+      color: var(--text);
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+
+    .refresh-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .user-list {
+      list-style: none;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .user-item {
+      padding: 0.75rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.95rem;
+    }
+
+    .user-item:last-child {
+      border-bottom: none;
+    }
+
+    .user-name {
+      font-weight: 500;
+    }
+
+    .user-date {
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .no-users {
+      color: var(--text-muted);
+      text-align: center;
+      padding: 1rem 0;
+      font-size: 0.9rem;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <h1>Amr's Platform Demo</h1>
+      <p>Continuous Delivery & Database Provisioning Sandbox</p>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('login')">Login</button>
+        <button class="tab" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <div id="alertBox" class="alert"></div>
+
+      <form id="authForm" onsubmit="handleSubmit(event)">
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" required autocomplete="off" placeholder="Enter username">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" required placeholder="Enter password">
+        </div>
+
+        <button type="submit" id="submitBtn" class="btn">Login</button>
+      </form>
+    </div>
+
+    <div class="database-viewer">
+      <h2>
+        <span>Live PostgreSQL Records</span>
+        <button class="refresh-btn" onclick="fetchUsers()">Refresh</button>
+      </h2>
+      <ul id="userList" class="user-list">
+        <li class="no-users">Loading users from Database...</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    let currentMode = 'login';
+
+    function switchTab(mode) {
+      currentMode = mode;
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      const activeTab = event.target;
+      activeTab.classList.add('active');
+      
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.innerText = mode === 'login' ? 'Login' : 'Register';
+      clearAlert();
+    }
+
+    function clearAlert() {
+      const alertBox = document.getElementById('alertBox');
+      alertBox.className = 'alert';
+      alertBox.innerText = '';
+    }
+
+    function showAlert(message, type) {
+      const alertBox = document.getElementById('alertBox');
+      alertBox.className = `alert alert-${type}`;
+      alertBox.innerText = message;
+    }
+
+    async function handleSubmit(event) {
+      event.preventDefault();
+      clearAlert();
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const endpoint = currentMode === 'login' ? '/api/login' : '/api/register';
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showAlert(data.message, 'success');
+          document.getElementById('authForm').reset();
+          if (currentMode === 'register') {
+            fetchUsers();
+          }
+        } else {
+          showAlert(data.error || 'Something went wrong', 'error');
+        }
+      } catch (err) {
+        showAlert('Cannot connect to server API', 'error');
+      }
+    }
+
+    async function fetchUsers() {
+      const userList = document.getElementById('userList');
+      try {
+        const response = await fetch('/api/users');
+        if (!response.ok) throw new Error();
+        const users = await response.json();
+        
+        userList.innerHTML = '';
+        if (users.length === 0) {
+          userList.innerHTML = '<li class="no-users">No users registered yet.</li>';
+          return;
+        }
+
+        users.forEach(user => {
+          const formattedDate = new Date(user.created_at).toLocaleString();
+          userList.innerHTML += `
+            <li class="user-item">
+              <span class="user-name">${escapeHTML(user.username)}</span>
+              <span class="user-date">${formattedDate}</span>
+            </li>
+          `;
+        });
+      } catch (err) {
+        userList.innerHTML = '<li class="no-users" style="color: var(--error)">Error fetching from Database</li>';
+      }
+    }
+
+    function escapeHTML(str) {
+      return str.replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+      );
+    }
+
+    // Auto-fetch users on load
+    fetchUsers();
+  </script>
+</body>
+</html>
